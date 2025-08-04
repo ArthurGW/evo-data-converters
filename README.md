@@ -70,7 +70,7 @@ There is more information in the [Welcome to Seequent Evo](https://developer.see
 Notebooks can be run in your tool of choice (e.g. VS Code). To use Jupyter (the default):
 
 ```
-uv sync --all-extras
+uv sync --all-packages --all-extras
 ```
 
 Then in the directory of the notebook(s) you want to run, type:
