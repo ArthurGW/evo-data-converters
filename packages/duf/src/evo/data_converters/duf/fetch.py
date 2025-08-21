@@ -1,20 +1,20 @@
 import asyncio
 import copy
-import dataclasses
 import enum
 import json
+from dataclasses import dataclass
+
 import numpy
-from typing import Optional
+from typing import Optional, Any
 
 from evo.data_converters.common import EvoObjectMetadata
 from evo.objects import ObjectAPIClient
-from evo.objects.utils import ObjectDataClient
+from evo.objects.utils import ObjectDataClient, Table
 from evo_schemas import json_loads, LineSegments_V2_0_0, LineSegments_V2_1_0, LineSegments_V2_2_0, TriangleMesh_V2_1_0
 from evo_schemas.elements.serialiser import GSONEncoder, Serialiser
 
-from numpy.typing import NDArray
 
-from evo.data_converters.duf.common.types import EvoAttributes, FetchedTriangleMesh
+from evo.data_converters.duf.common.types import EvoAttributes, FetchedTriangleMesh, FetchedLines
 
 
 class FetchStatus(enum.Enum):
@@ -24,11 +24,20 @@ class FetchStatus(enum.Enum):
     downloaded = enum.auto()
     processing = enum.auto()
     processed = enum.auto()
+    failed = enum.auto()
+
+
+@dataclass
+class FetchResult:
+    status: FetchStatus
+    status_message: str
+    result: Any
 
 
 class Fetch:
     def __init__(self, object_metadata: EvoObjectMetadata):
         self.status = FetchStatus.not_begun
+        self.status_msg = ''
         self._object_metadata = object_metadata
         self._object_specific_fetcher: Optional[_ObjectSpecificFetch] = None
 
@@ -46,7 +55,12 @@ class Fetch:
         )
         geo_object: Serialiser = json_loads(json.dumps(downloaded_obj.as_dict(), cls=GSONEncoder))
 
-        self._object_specific_fetcher = self.get_fetcher(geo_object.SCHEMA_ID)
+        try:
+            self._object_specific_fetcher = self.get_fetcher(geo_object.SCHEMA_ID)
+        except NotImplementedError:
+            self.status = FetchStatus.failed
+            self.status_msg = f'Schema {geo_object.SCHEMA_ID} not supported'
+            return self
 
         self.status = FetchStatus.downloading_tables
 
@@ -76,7 +90,11 @@ class Fetch:
     async def _async_downloader(cls, as_completed_future):
         for result in as_completed_future:
             fetcher = await result
-            yield fetcher.process()
+            if fetcher.status == FetchStatus.failed:
+                yield FetchResult(status=fetcher.status, status_message=fetcher.status_msg, result=None)
+            else:
+                processed = fetcher.process()
+                yield FetchResult(status=fetcher.status, status_message=fetcher.status_msg, result=processed)
 
     @classmethod
     def download_all(
@@ -103,13 +121,47 @@ class _ObjectSpecificFetch:
     def process(self):
         raise NotImplementedError()
 
+    @staticmethod
+    async def _get_attributes_from_parts(parts, data_client, obj_id, version_id) -> tuple[list[EvoAttributes], list[Table | None]]:
+        attributes = []
+        lookups = []
+        if parts is not None:
+            for attrs in parts.attributes:
+                # TODO What is "nan_description"?
+                column = await data_client.download_table(obj_id, version_id, attrs.values.as_dict())
+                attrs_column = EvoAttributes(
+                    name=attrs.name,
+                    values=column,
+                    type=attrs.attribute_type,
+                    description=attrs.attribute_description,
+                    nan_description=getattr(attrs, 'nan_description', None)
+                )
+                attributes.append(attrs_column)
 
-# TODO Should probably rename this "LineSegments"
-@dataclasses.dataclass
-class FetchedPolyline:
-    name: str
-    paths: list[NDArray[numpy.float64]]  # Lists of arrays of 3D points
-    attributes: list[dict]
+                lookup_table = getattr(attrs, 'table', None)
+                if lookup_table is not None:
+                    lookup = await data_client.download_table(obj_id, version_id, lookup_table.as_dict())
+                    lookups.append(lookup)
+                else:
+                    lookups.append(None)
+        return attributes, lookups
+
+    @staticmethod
+    def _process_attrs(attributes: list[EvoAttributes], lookups: list[Table | None]) -> list[EvoAttributes]:
+        processed_attr_columns = []
+        for attr_table, lookup_table in zip(attributes, lookups):
+            attr_table = copy.copy(attr_table)
+            attr_values = numpy.asarray(attr_table.values)
+            attr_values.reshape(len(attr_values))
+            if lookup_table is None:
+                processed = attr_values
+            else:
+                lookup = {k: v for k, v in numpy.asarray(lookup_table)}
+                lookup_vec = numpy.vectorize(lookup.get)
+                processed = lookup_vec(attr_values)
+            attr_table.values = processed.reshape(len(processed))
+            processed_attr_columns.append(attr_table)
+        return processed_attr_columns
 
 
 class FetchPolyline(_ObjectSpecificFetch):
@@ -146,21 +198,9 @@ class FetchPolyline(_ObjectSpecificFetch):
         else:
             self._chunks = None
 
-        self._attributes = []
-        self._lookups = []
-        if geo_object.parts is not None:
-            for attrs in geo_object.parts.attributes:
-                # TODO What is "nan_description"?
-                column = await data_client.download_table(obj_id, version_id, attrs.values.as_dict())
-                self._attributes.append({'name': attrs.name, 'values': column, 'type': attrs.attribute_type, 'description': attrs.attribute_description, 'nan_description': getattr(attrs, 'nan_description', None)})
-                lookup_table = getattr(attrs, 'table', None)
-                if lookup_table is not None:
-                    lookup = await data_client.download_table(obj_id, version_id, lookup_table.as_dict())
-                    self._lookups.append(lookup)
-                else:
-                    self._lookups.append(None)
+        self._attributes, self._lookups = await self._get_attributes_from_parts(geo_object.parts, data_client, obj_id, version_id)
 
-    def process(self) -> FetchedPolyline:
+    def process(self) -> FetchedLines:
         indices_table = numpy.asarray(self._indices)
         vertices_table = numpy.asarray(self._vertices)
 
@@ -184,21 +224,8 @@ class FetchPolyline(_ObjectSpecificFetch):
 
             paths.append(path)
 
-        processed_attr_columns = []
-        for attr_table, lookup_table in zip(self._attributes, self._lookups):
-            attr_table = attr_table.copy()
-            attr_values = numpy.asarray(attr_table['values'])
-            attr_values.reshape(len(attr_values))
-            if lookup_table is None:
-                processed = attr_values
-            else:
-                lookup = {k: v for k, v in numpy.asarray(lookup_table)}
-                lookup_vec = numpy.vectorize(lookup.get)
-                processed = lookup_vec(attr_values)
-            attr_table['values'] = processed.reshape(len(processed))
-            processed_attr_columns.append(attr_table)
-
-        return FetchedPolyline(self._name, paths, processed_attr_columns)
+        processed_attr_columns = self._process_attrs(self._attributes, self._lookups)
+        return FetchedLines(self._name, paths, processed_attr_columns)
 
 
 class FetchTriangleMesh(_ObjectSpecificFetch):
@@ -207,7 +234,6 @@ class FetchTriangleMesh(_ObjectSpecificFetch):
         "/objects/triangle-mesh/2.1.0/triangle-mesh.schema.json",
     ]
 
-
     def __init__(self):
         self._name = None
         self._indices = None
@@ -215,7 +241,6 @@ class FetchTriangleMesh(_ObjectSpecificFetch):
         self._chunks = None
         self._attributes = None
         self._lookups = None
-
 
     async def download_blobs(self, geo_object: TriangleMesh_V2_1_0, version_id: str, data_client):
         obj_id = geo_object.uuid
@@ -228,26 +253,7 @@ class FetchTriangleMesh(_ObjectSpecificFetch):
         else:
             self._chunks = None
 
-        self._attributes = []
-        self._lookups = []
-        if geo_object.parts is not None:
-            for attrs in geo_object.parts.attributes:
-                # TODO What is "nan_description"?
-                column = await data_client.download_table(obj_id, version_id, attrs.values.as_dict())
-                attrs_column = EvoAttributes(
-                    name=attrs.name,
-                    values=column,
-                    type=attrs.attribute_type,
-                    description=attrs.attribute_description,
-                    nan_description=getattr(attrs, 'nan_description', None)
-                )
-                self._attributes.append(attrs_column)
-                lookup_table = getattr(attrs, 'table', None)
-                if lookup_table is not None:
-                    lookup = await data_client.download_table(obj_id, version_id, lookup_table.as_dict())
-                    self._lookups.append(lookup)
-                else:
-                    self._lookups.append(None)
+        self._attributes, self._lookups = await self._get_attributes_from_parts(geo_object.parts, data_client, obj_id, version_id)
 
     def process(self) -> FetchedTriangleMesh:
         indices_table = numpy.asarray(self._indices)
@@ -262,30 +268,5 @@ class FetchTriangleMesh(_ObjectSpecificFetch):
         for start, length in chunks_table:
             parts.append(indices_table[start: start + length])
 
-        # mesh_parts = []
-        # for part in parts:
-        #     _part_indices = indices_table[part[:, 0]]
-        #     path = numpy.append(_path, vertices_table[part[-1, -1]].reshape(1, 3), axis=0)
-        #
-        #     if len(path) == 2 and numpy.array_equal(path[0], path[1]):
-        #         print(f"Skipped point {path}")
-        #         continue
-        #
-        #     paths.append(path)
-
-        processed_attr_columns = []
-        for attr_table, lookup_table in zip(self._attributes, self._lookups):
-            attr_table = copy.copy(attr_table)
-            attr_values = numpy.asarray(attr_table.values)
-            attr_values.reshape(len(attr_values))
-            if lookup_table is None:
-                processed = attr_values
-            else:
-                lookup = {k: v for k, v in numpy.asarray(lookup_table)}
-                lookup_vec = numpy.vectorize(lookup.get)
-                processed = lookup_vec(attr_values)
-            attr_table.values = processed.reshape(len(processed))
-            processed_attr_columns.append(attr_table)
-
+        processed_attr_columns = self._process_attrs(self._attributes, self._lookups)
         return FetchedTriangleMesh(self._name, vertices_table, parts, processed_attr_columns)
-

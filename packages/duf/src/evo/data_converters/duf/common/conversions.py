@@ -2,7 +2,7 @@
 import numpy
 import pandas
 
-from evo.data_converters.duf.common.types import AttributedEvoData, FetchedTriangleMesh
+from evo.data_converters.duf.common.types import AttributedEvoData, FetchedTriangleMesh, FetchedLines, EvoAttributes
 
 EVO_TO_DW_TYPE_CONVERSION = {
     'string': 'String',
@@ -19,13 +19,11 @@ def np_to_dw(maybe_np):
     elif isinstance(maybe_np, float) or numpy.issubdtype(maybe_np, numpy.floating):
         f = float(maybe_np)
         if numpy.isnan(f):
-            # TODO review returning an empty string. This is how it appeared to me when importing Deswik entities
-            #  that were missing attributes.
+            # It appears that missing attributes in Deswik CAD are represented as an empty string
             return ''
         else:
             return f
     elif numpy.issubdtype(maybe_np, numpy.datetime64):
-        # TODO Check the expected datetime format in Deswik.Cad
         return pandas.to_datetime(maybe_np).strftime('%Y-%m-%d %H:%M:%S')
     elif isinstance(maybe_np, int) or numpy.issubdtype(maybe_np, numpy.integer):
         return int(maybe_np)
@@ -39,8 +37,20 @@ class Layer:
         self._attributes = dw_attributes
 
     @staticmethod
+    def _get_unique_layer_name(duf, name: str):
+        if not name:
+            name = 'default'
+        if not duf.LayerExists(name):
+            return name
+        suffix = 2
+        while duf.LayerExists(new_name := f'{name} ({suffix})'):
+            suffix += 1
+        return new_name
+
+    @staticmethod
     def with_attributes(duf, evo_data: AttributedEvoData):
-        new_layer = duf.NewLayer(evo_data.name)
+        new_layer_name = Layer._get_unique_layer_name(duf, evo_data.name)
+        new_layer = duf.NewLayer(new_layer_name)
         dw_attributes = {
             attr.name: new_layer.AddAttribute(attr.name, EVO_TO_DW_TYPE_CONVERSION[attr.type])
             for attr in evo_data.attributes
@@ -49,6 +59,13 @@ class Layer:
 
     def __getitem__(self, item: str):
         return self._attributes[item]
+
+    def set_attributes_to_entity(self, dw_entity, evo_attributes: list[EvoAttributes], i: int):
+        for attr in evo_attributes:
+            value = attr.values[i]
+            converted = np_to_dw(value)
+            dw_attr = self[attr.name]
+            dw_entity.SetAttribute(dw_attr, converted)
 
 
 class EvoDufWriter:
@@ -68,8 +85,13 @@ class EvoDufWriter:
             flattened_triangles = part.flatten().tolist()
             new_polyface.SetVertices3D(flattened_vertices, flattened_triangles)
 
-            for attr in mesh_triangles.attributes:
-                value = attr.values[i]
-                converted = np_to_dw(value)
-                dw_attr = new_layer[attr.name]
-                new_polyface.SetAttribute(dw_attr, converted)
+            new_layer.set_attributes_to_entity(new_polyface, mesh_triangles.attributes, i)
+
+    def write_lines(self, lines: FetchedLines):
+        new_layer = Layer.with_attributes(self._duf, lines)
+
+        for i, path in enumerate(lines.paths):
+            new_polyline = self._duf.NewPolyline(new_layer.layer)
+            new_polyline.SetVertices3D(path.flatten())
+
+            new_layer.set_attributes_to_entity(new_polyline, lines.attributes, i)

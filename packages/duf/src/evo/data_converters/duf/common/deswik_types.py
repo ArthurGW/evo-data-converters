@@ -1,4 +1,7 @@
+# ruff: noqa: E402
 
+# This links the C# libraries and sets up the Python runtime to import Deswik's C# libraries
+from evo.data_converters.duf.common import setup_deswik_lib_bindings  # noqa: F401
 
 from Deswik.Core.Structures import Vector3_dp, Vector4_dp
 from Deswik.Duf import (
@@ -31,7 +34,7 @@ from Deswik.Entities.Cad import (
     dwPoint,
 )
 from Deswik.Serialization import GuidReferences
-from System import Boolean, Double, Guid, Int32, NullReferenceException, String, UInt32
+from System import ArgumentException, Boolean, Double, Guid, Int32, NullReferenceException, String, UInt32
 from System.Collections.Generic import List
 from System.Reflection import BindingFlags
 
@@ -78,6 +81,7 @@ __all__ = [
     "XProperty",
     "XProperties",
     # System
+    "ArgumentException",
     "Boolean",
     "Guid",
     "NullReferenceException",
