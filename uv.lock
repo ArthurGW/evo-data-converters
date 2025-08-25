@@ -564,7 +564,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "evo-data-converters-common" },
-    { name = "evo-data-converters-duf" },
+    { name = "evo-data-converters-duf", marker = "sys_platform == 'win32'" },
     { name = "evo-data-converters-gocad" },
     { name = "evo-data-converters-omf" },
     { name = "evo-data-converters-resqml" },
@@ -587,7 +587,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "evo-data-converters-common", editable = "packages/common" },
-    { name = "evo-data-converters-duf", editable = "packages/duf" },
+    { name = "evo-data-converters-duf", marker = "sys_platform == 'win32'", editable = "packages/duf" },
     { name = "evo-data-converters-gocad", editable = "packages/gocad" },
     { name = "evo-data-converters-omf", editable = "packages/omf" },
     { name = "evo-data-converters-resqml", editable = "packages/resqml" },
