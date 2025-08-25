@@ -1,3 +1,14 @@
+#  Copyright © 2025 Bentley Systems, Incorporated
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import asyncio
 import copy
 import enum
@@ -37,7 +48,7 @@ class FetchResult:
 class Fetch:
     def __init__(self, object_metadata: EvoObjectMetadata):
         self.status = FetchStatus.not_begun
-        self.status_msg = ''
+        self.status_msg = ""
         self._object_metadata = object_metadata
         self._object_specific_fetcher: Optional[_ObjectSpecificFetch] = None
 
@@ -59,7 +70,7 @@ class Fetch:
             self._object_specific_fetcher = self.get_fetcher(geo_object.SCHEMA_ID)
         except NotImplementedError:
             self.status = FetchStatus.failed
-            self.status_msg = f'Schema {geo_object.SCHEMA_ID} not supported'
+            self.status_msg = f"Schema {geo_object.SCHEMA_ID} not supported"
             return self
 
         self.status = FetchStatus.downloading_tables
@@ -122,7 +133,9 @@ class _ObjectSpecificFetch:
         raise NotImplementedError()
 
     @staticmethod
-    async def _get_attributes_from_parts(parts, data_client, obj_id, version_id) -> tuple[list[EvoAttributes], list[Table | None]]:
+    async def _get_attributes_from_parts(
+        parts, data_client, obj_id, version_id
+    ) -> tuple[list[EvoAttributes], list[Table | None]]:
         attributes = []
         lookups = []
         if parts is not None:
@@ -134,11 +147,11 @@ class _ObjectSpecificFetch:
                     values=column,
                     type=attrs.attribute_type,
                     description=attrs.attribute_description,
-                    nan_description=getattr(attrs, 'nan_description', None)
+                    nan_description=getattr(attrs, "nan_description", None),
                 )
                 attributes.append(attrs_column)
 
-                lookup_table = getattr(attrs, 'table', None)
+                lookup_table = getattr(attrs, "table", None)
                 if lookup_table is not None:
                     lookup = await data_client.download_table(obj_id, version_id, lookup_table.as_dict())
                     lookups.append(lookup)
@@ -198,7 +211,9 @@ class FetchPolyline(_ObjectSpecificFetch):
         else:
             self._chunks = None
 
-        self._attributes, self._lookups = await self._get_attributes_from_parts(geo_object.parts, data_client, obj_id, version_id)
+        self._attributes, self._lookups = await self._get_attributes_from_parts(
+            geo_object.parts, data_client, obj_id, version_id
+        )
 
     def process(self) -> FetchedLines:
         indices_table = numpy.asarray(self._indices)
@@ -253,7 +268,9 @@ class FetchTriangleMesh(_ObjectSpecificFetch):
         else:
             self._chunks = None
 
-        self._attributes, self._lookups = await self._get_attributes_from_parts(geo_object.parts, data_client, obj_id, version_id)
+        self._attributes, self._lookups = await self._get_attributes_from_parts(
+            geo_object.parts, data_client, obj_id, version_id
+        )
 
     def process(self) -> FetchedTriangleMesh:
         indices_table = numpy.asarray(self._indices)
@@ -266,7 +283,7 @@ class FetchTriangleMesh(_ObjectSpecificFetch):
 
         parts = []
         for start, length in chunks_table:
-            parts.append(indices_table[start: start + length])
+            parts.append(indices_table[start : start + length])
 
         processed_attr_columns = self._process_attrs(self._attributes, self._lookups)
         return FetchedTriangleMesh(self._name, vertices_table, parts, processed_attr_columns)

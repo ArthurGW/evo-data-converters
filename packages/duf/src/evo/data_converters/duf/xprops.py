@@ -1,73 +1,81 @@
+#  Copyright © 2025 Bentley Systems, Incorporated
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 from evo.data_converters.duf.common import deswik_types as dw
 
 # TODO The code for dealing with DUF XProperties is mostly unused. It was written before we had done much of this work
 #  in C#.
 
 possible_boxed_types: list[str] = [
-    'Vector2_dp',
-    'Vector3_dp',
-    'Vector4_dp',
-    'Color',
-    'Boolean',
-    'Byte',
-    'SByte',
-    'Char',
-    'Double',
-    'Single',
-    'Int32',
-    'UInt32',
-    'Int64',
-    'UInt64',
-    'BaseObject',
-    'Int16',
-    'UInt16',
-    'String',
-    'Ticks',
-    'DateTimeKind',
-    'ArrayVector2_dp,'
-    'ArrayVector3_dp,'
-    'ArrayVector4_dp,'
-    'ArrayColor',
-    'ArrayBoolean',
-    'ArrayByte',
-    'ArraySByte',
-    'ArrayChar',
-    'ArrayDouble',
-    'ArraySingle',
-    'ArrayInt32',
-    'ArrayUInt32',
-    'ArrayInt64',
-    'ArrayUInt64',
-    'ArrayInt16',
-    'ArrayUInt16',
-    'ArrayString',
-    'ArrayTicks',
-    'ArrayDateTimeKind',
-    'DufListVector2_dp',
-    'DufListVector3_dp',
-    'DufListVector4_dp',
-    'DufListColor',
-    'DufListBoolean',
-    'DufListByte',
-    'DufListSByte',
-    'DufListChar',
-    'DufListDouble',
-    'DufListSingle',
-    'DufListInt32',
-    'DufListUInt32',
-    'DufListInt64',
-    'DufListUInt64',
-    'DufListInt16',
-    'DufListUInt16',
-    'DufListString',
-    'DufListTicks',
-    'DufListDateTimeKind',
+    "Vector2_dp",
+    "Vector3_dp",
+    "Vector4_dp",
+    "Color",
+    "Boolean",
+    "Byte",
+    "SByte",
+    "Char",
+    "Double",
+    "Single",
+    "Int32",
+    "UInt32",
+    "Int64",
+    "UInt64",
+    "BaseObject",
+    "Int16",
+    "UInt16",
+    "String",
+    "Ticks",
+    "DateTimeKind",
+    "ArrayVector2_dp,ArrayVector3_dp,ArrayVector4_dp,ArrayColor",
+    "ArrayBoolean",
+    "ArrayByte",
+    "ArraySByte",
+    "ArrayChar",
+    "ArrayDouble",
+    "ArraySingle",
+    "ArrayInt32",
+    "ArrayUInt32",
+    "ArrayInt64",
+    "ArrayUInt64",
+    "ArrayInt16",
+    "ArrayUInt16",
+    "ArrayString",
+    "ArrayTicks",
+    "ArrayDateTimeKind",
+    "DufListVector2_dp",
+    "DufListVector3_dp",
+    "DufListVector4_dp",
+    "DufListColor",
+    "DufListBoolean",
+    "DufListByte",
+    "DufListSByte",
+    "DufListChar",
+    "DufListDouble",
+    "DufListSingle",
+    "DufListInt32",
+    "DufListUInt32",
+    "DufListInt64",
+    "DufListUInt64",
+    "DufListInt16",
+    "DufListUInt16",
+    "DufListString",
+    "DufListTicks",
+    "DufListDateTimeKind",
 ]
 
 
 def _infer_boxed_type(prop: dw.PropValue) -> str | None:
     for pbt in possible_boxed_types:
-        if getattr(prop, 'Value' + pbt) is not None:
+        if getattr(prop, "Value" + pbt) is not None:
             return pbt
     return None
 
@@ -94,7 +102,7 @@ def _cast_to_csharp(value, csharp_type: str):
         case "Double":
             return dw.Double(value)
 
-    raise NotImplementedError(f'Unsupported type: {csharp_type}')
+    raise NotImplementedError(f"Unsupported type: {csharp_type}")
 
 
 def _set_xprops_csharp_value(xproperties: dw.XProperties, key: str, values):
@@ -131,13 +139,13 @@ class XBindings:
         self.defaults = default if (default is None or isinstance(default, list)) else [default]
         self.default_missing = default_missing
 
-    def __get__(self, instance: 'XPropertiesWrapper', owner):
+    def __get__(self, instance: "XPropertiesWrapper", owner):
         result = instance.get_xvalue(instance.key_with_prefix(self.key))
         if result is None:
             return self.default_missing
         return result
 
-    def __set__(self, instance: 'XPropertiesWrapper', values):
+    def __set__(self, instance: "XPropertiesWrapper", values):
         values = values if isinstance(values, list) else [values]
         instance.set_xvalue(instance.key_with_prefix(self.key), values, self.types)
 
@@ -148,7 +156,6 @@ class XBindings:
 
 
 class XPropertiesWrapper:
-
     def __init__(self, xproperties: dw.XProperties):
         self._xproperties = xproperties
 
@@ -182,7 +189,11 @@ class AttributesSpecXProperties(XPropertiesWrapper):
     DefaultValue = XBindings("DefaultValue", "String", default="")
     DisplayInProperties = XBindings("DisplayInProperties", "Boolean", default=True)
     Group = XBindings("Group", "String", default="")
-    Prompt = XBindings("Prompt", "Boolean", default=False,)
+    Prompt = XBindings(
+        "Prompt",
+        "Boolean",
+        default=False,
+    )
     Description = XBindings("Description", "String", default="")
     ValuesList = XBindings("ValuesList", "String", default="")  # TODO check type
     LimitToList = XBindings("LimitToList", "Boolean", default=False)
@@ -202,7 +213,6 @@ class LayerXProperties(XPropertiesWrapper):
     LastModifiedDate = XBindings("_dw_LastModifiedDate", "String")
     X_ENTITIES_COUNT = XBindings("X_ENTITIES_COUNT", "Int32")
 
-
     def new_attribute(self) -> AttributesSpecXProperties:
         old_count = self.AttributeCount or 0
         self.AttributeCount = old_count + 1
@@ -218,11 +228,10 @@ class ObjAttributesXProperties(XPropertiesWrapper):
         super().__init__(xproperties)
         self._layer = layer
 
-
     def __getitem__(self, item: str):
         return self.get_xvalue(item)
 
-    def __setitem__(self, item: str, value : dw.String | dw.Double):
+    def __setitem__(self, item: str, value: dw.String | dw.Double):
         # TODO The types should be able to be inferred from the xrops attribute specs. But for some reason it appears
         #  that the int attributes are written as doubles, so inference can't be relied on. (???)
         _set_xprops_csharp_value(self._xproperties, item, [value])

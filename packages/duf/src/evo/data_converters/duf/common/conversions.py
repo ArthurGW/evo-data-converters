@@ -1,3 +1,13 @@
+#  Copyright © 2025 Bentley Systems, Incorporated
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
 import numpy
 import pandas
@@ -5,11 +15,11 @@ import pandas
 from evo.data_converters.duf.common.types import AttributedEvoData, FetchedTriangleMesh, FetchedLines, EvoAttributes
 
 EVO_TO_DW_TYPE_CONVERSION = {
-    'string': 'String',
-    'scalar': 'Double',
-    'category': 'String',
-    'date_time': 'DateTime',
-    'integer': 'Integer',
+    "string": "String",
+    "scalar": "Double",
+    "category": "String",
+    "date_time": "DateTime",
+    "integer": "Integer",
 }
 
 
@@ -20,15 +30,15 @@ def np_to_dw(maybe_np):
         f = float(maybe_np)
         if numpy.isnan(f):
             # It appears that missing attributes in Deswik CAD are represented as an empty string
-            return ''
+            return ""
         else:
             return f
     elif numpy.issubdtype(maybe_np, numpy.datetime64):
-        return pandas.to_datetime(maybe_np).strftime('%Y-%m-%d %H:%M:%S')
+        return pandas.to_datetime(maybe_np).strftime("%Y-%m-%d %H:%M:%S")
     elif isinstance(maybe_np, int) or numpy.issubdtype(maybe_np, numpy.integer):
         return int(maybe_np)
     else:
-        raise NotImplementedError(f'Unhandled type {type(maybe_np)}')
+        raise NotImplementedError(f"Unhandled type {type(maybe_np)}")
 
 
 class Layer:
@@ -39,11 +49,11 @@ class Layer:
     @staticmethod
     def _get_unique_layer_name(duf, name: str):
         if not name:
-            name = 'default'
+            name = "default"
         if not duf.LayerExists(name):
             return name
         suffix = 2
-        while duf.LayerExists(new_name := f'{name} ({suffix})'):
+        while duf.LayerExists(new_name := f"{name} ({suffix})"):
             suffix += 1
         return new_name
 
@@ -68,7 +78,7 @@ class Layer:
             dw_entity.SetAttribute(dw_attr, converted)
 
 
-class EvoDufWriter:
+class EvoDUFWriter:
     def __init__(self, duf):
         self._duf = duf
 

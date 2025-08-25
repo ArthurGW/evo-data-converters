@@ -1,15 +1,26 @@
+#  Copyright © 2025 Bentley Systems, Incorporated
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import clr
 
 from evo.data_converters.duf.common import deswik_types as dw
-from evo.data_converters.duf.common import DufWrapper, InvalidDufFileException
+from evo.data_converters.duf.common import DUFWrapper, InvalidDUFFileException
 
 
 def is_duf(filepath: str) -> bool:
     """Returns `True` if the file appears to be a valid DUF file"""
     try:
-        with DufWrapper(filepath, None) as instance:
+        with DUFWrapper(filepath, None) as instance:
             instance.LoadSettings()
-    except InvalidDufFileException:
+    except InvalidDUFFileException:
         return False
     else:
         return True
@@ -38,12 +49,12 @@ def reflect_method(method):
         try:
             if p.HasDefaultValue:
                 print(f"    Default value: {p.DefaultValue}")
-        except:
+        except:  # noqa: E722  # Do not use bare `except`
             print("    Can't have default value (?)")
 
     try:
         [print(f"    Return type: {p.ReturnType}")]
-    except:
+    except:  # noqa: E722  # Do not use bare `except`
         print("    No return type")
 
 
@@ -71,6 +82,3 @@ def reflect_constructors(csharp_type):
 
 def reflect_nested_type(csharp_type, nested: str):
     clr.GetClrType(csharp_type).GetNestedType(nested)
-
-
-

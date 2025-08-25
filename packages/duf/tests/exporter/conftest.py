@@ -9,16 +9,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .duf_wrapper import (
-    DUFFileNotFoundException,
-    DUFWrapper,
-    InvalidDUFFileException,
-    ObjectCollector,
-)
+from pathlib import Path
 
-__all__ = [
-    "DUFFileNotFoundException",
-    "DUFWrapper",
-    "InvalidDUFFileException",
-    "ObjectCollector",
-]
+import pytest
+
+
+@pytest.fixture(scope="session")
+def polyline_attrs_boat_path():
+    return str((Path(__file__).parent.parent / "data" / "polyline_attrs_boat.duf").resolve())
+
+
+@pytest.fixture(scope="session")
+def pit_mesh_attrs_path():
+    return str((Path(__file__).parent.parent / "data" / "pit_mesh_attrs.duf").resolve())
+
+
+@pytest.fixture(scope="function")
+def test_out_path(tmp_path):
+    return str(tmp_path / "test_out.duf")
