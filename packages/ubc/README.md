@@ -5,7 +5,7 @@
 </p>
 <p align="center">
     <a href="https://developer.seequent.com/" target="_blank">Seequent Developer Portal</a>
-    &bull; <a href="https://community.seequent.com/" target="_blank">Seequent Community</a>
+    &bull; <a href="https://community.seequent.com/group/19-evo" target="_blank">Seequent Community</a>
     &bull; <a href="https://seequent.com" target="_blank">Seequent website</a>
 </p>
 
@@ -21,13 +21,17 @@ Evo is powered by Seequent, a Bentley organisation.
 
 ## Installation
 
-```
+```shell
 pip install evo-data-converters-ubc
 ```
 
 ## UBC
 
 See https://help.seequent.com/Geo/5.0/en-GB/Content/block-models/ubc-grids.htm.
+
+## Usage
+
+For examples of using this package, see the [Jupyter notebooks.](samples/convert-ubc)
 
 ## Code of conduct
 

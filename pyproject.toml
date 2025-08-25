@@ -17,14 +17,21 @@ dependencies = [
 
 [project.optional-dependencies]
 notebooks = [
-    "evo-sdk-common[notebooks]<=0.2.0",
+    "evo-sdk-common[notebooks]",
     "notebook>=7.4.3",
 ]
 
+[project.urls]
+Source = "https://github.com/SeequentEvo/evo-python-sdk"
+Tracker = "https://github.com/SeequentEvo/evo-python-sdk/issues"
+Homepage = "https://www.seequent.com/"
+Documentation = "https://developer.seequent.com/"
+
 [dependency-groups]
 dev = [
+  "pre-commit >= 4",
+  "ruff==0.9.1",              # keep in sync with .pre-commit-config.yaml
   "mypy",
-  "ruff",
 ]
 
 [tool.uv.sources]
